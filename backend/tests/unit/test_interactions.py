@@ -1,8 +1,9 @@
 """Unit tests for interaction filtering logic."""
-
+import pytest
 from app.models.interaction import InteractionLog
 from app.routers.interactions import _filter_by_item_id
-
+from httpx import ASGITransport, AsyncClient
+from app.main import app
 
 def _make_log(id: int, learner_id: int, item_id: int) -> InteractionLog:
     return InteractionLog(id=id, learner_id=learner_id, item_id=item_id, kind="attempt")
@@ -50,3 +51,22 @@ def test_filter_excludes_interaction_with_different_learner_id() -> None:
 # ⠀⠀⠀⠸⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⠀⠀⠀
 # ⠀⠀⠀⣠⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⡿⠀⠀⠀⠀
 # ⠀⠀⠀⢹⣿⣵⣾⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣯⡁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+def test_filter_returns_empty_for_nonexistent_item_id() -> None:
+    """Test that filter returns empty list when item_id doesn't exist."""
+    interactions = [_make_log(1, 1, 1), _make_log(2, 2, 2)]
+    result = _filter_by_item_id(interactions, 999)
+    assert result == []
+
+
+def test_filter_works_with_multiple_matching_items() -> None:
+    """Test that filter returns all interactions with the same item_id."""
+    interactions = [
+        _make_log(1, 1, 1),
+        _make_log(2, 2, 1),
+        _make_log(3, 3, 2),
+        _make_log(4, 4, 1)
+    ]
+    result = _filter_by_item_id(interactions, 1)
+    assert len(result) == 3
+    assert all(i.item_id == 1 for i in result)
+
